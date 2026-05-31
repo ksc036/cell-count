@@ -77,6 +77,7 @@ function App() {
   const [hoveredPatchId, setHoveredPatchId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("full");
   const [focusedPatchId, setFocusedPatchId] = useState<string | null>(null);
+  const [lastFocusedPatchId, setLastFocusedPatchId] = useState<string | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.22);
   const [globalAnalysisOptions, setGlobalAnalysisOptions] = useState<AnalyzeOptions>({
     probThresh: 0.5,
@@ -144,17 +145,81 @@ function App() {
     };
   }, [focusedPatchId, globalAnalysisOptions, patchAnalysisOptionsById]);
   const currentManualCount = focusedPatchId ? String(manualCounts[focusedPatchId] ?? "") : "";
+  const displayedManualCount = viewMode === "full" ? String(totalCounts.manualAddedCount || "") : currentManualCount;
 
   useEffect(() => {
-    if (viewMode !== "patch") {
-      return;
-    }
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) {
         return;
       }
-      if (event.key === "ArrowLeft") {
+
+      if (viewMode === "full") {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setPlacementMode(null);
+          setPreviewPosition(null);
+          setDeleteMode(false);
+          setSelectPatchMode(false);
+          setHoveredPatchId(null);
+          return;
+        }
+
+        if (event.code === "KeyR" || event.key.toLowerCase() === "r") {
+          event.preventDefault();
+          void handleAnalyze();
+          return;
+        }
+
+        if (event.code === "KeyH" || event.key.toLowerCase() === "h") {
+          event.preventDefault();
+          setDeleteMode(false);
+          setSelectPatchMode(false);
+          setPlacementMode((current) => (current === "horizontal" ? null : "horizontal"));
+          return;
+        }
+
+        if (event.code === "KeyV" || event.key.toLowerCase() === "v") {
+          event.preventDefault();
+          setDeleteMode(false);
+          setSelectPatchMode(false);
+          setPlacementMode((current) => (current === "vertical" ? null : "vertical"));
+          return;
+        }
+      }
+
+      const isToggleFullViewKey = event.code === "KeyF" || event.key.toLowerCase() === "f";
+
+      if (isToggleFullViewKey) {
+        event.preventDefault();
+        if (viewMode === "patch") {
+          setViewMode("full");
+          setFocusedPatchId(null);
+          return;
+        }
+
+        const fallbackPatch = navigablePatches[0] ?? effectiveSelectedPatches[0] ?? patches[0] ?? null;
+        const nextPatch =
+          navigablePatches.find((patch) => patch.id === lastFocusedPatchId) ??
+          effectiveSelectedPatches.find((patch) => patch.id === lastFocusedPatchId) ??
+          patches.find((patch) => patch.id === lastFocusedPatchId) ??
+          fallbackPatch;
+
+        if (nextPatch) {
+          setViewMode("patch");
+          setFocusedPatchId(nextPatch.id);
+          setLastFocusedPatchId(nextPatch.id);
+        }
+        return;
+      }
+
+      if (viewMode !== "patch") {
+        return;
+      }
+      if (event.code === "KeyR" || event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        void handleAnalyzeFocusedPatch();
+      } else if (event.key === "ArrowLeft") {
         event.preventDefault();
         handleFocusSiblingPatch("previous");
       } else if (event.key === "ArrowRight") {
@@ -164,7 +229,7 @@ function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [viewMode, focusedPatchId, navigablePatches]);
+  }, [viewMode, lastFocusedPatchId, navigablePatches, effectiveSelectedPatches, patches, handleAnalyze, handleAnalyzeFocusedPatch]);
 
   async function handleFileChange(file: File | null) {
     if (!file) {
@@ -188,6 +253,7 @@ function App() {
       setHoveredPatchId(null);
       setViewMode("full");
       setFocusedPatchId(null);
+      setLastFocusedPatchId(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load the selected image.");
     }
@@ -202,10 +268,11 @@ function App() {
     setSelectedPatchIds(new Set());
     setViewMode("full");
     setFocusedPatchId(null);
+    setLastFocusedPatchId(null);
     setLines((current) => [...current, { id: nextLineId(), orientation, position }]);
   }
 
-  async function analyzeTargetPatches(targetPatches: typeof patches, options: AnalyzeOptions) {
+  async function analyzeTargetPatches(targetPatches: typeof patches, options: AnalyzeOptions, replaceAll = false) {
     if (!imageState) {
       setErrorMessage("Upload an image before running analysis.");
       return;
@@ -215,6 +282,11 @@ function App() {
       return;
     }
 
+    setPlacementMode(null);
+    setPreviewPosition(null);
+    setDeleteMode(false);
+    setSelectPatchMode(false);
+    setHoveredPatchId(null);
     setIsAnalyzing(true);
     setErrorMessage(null);
 
@@ -224,8 +296,11 @@ function App() {
       const response = await analyzePatches(API_BASE_URL, uploads, options);
       const incomingOverlayMap = mergePatchResultsByPatch(patches, response.patchResults);
       const returnedPatchIds = response.patchResults.map((result) => result.patchId);
-      setOverlayMap((current) => replaceOverlayMap(current, incomingOverlayMap));
+      setOverlayMap((current) => (replaceAll ? incomingOverlayMap : replaceOverlayMap(current, incomingOverlayMap)));
       setDeletedOverlayIds((current) => {
+        if (replaceAll) {
+          return new Set();
+        }
         const next = new Set(current);
         for (const patchId of returnedPatchIds) {
           for (const overlayId of collectPatchOverlayIds(overlayMap, patchId)) {
@@ -234,7 +309,7 @@ function App() {
         }
         return next;
       });
-      setAnalyzedPatchIds((current) => new Set([...current, ...returnedPatchIds]));
+      setAnalyzedPatchIds((current) => (replaceAll ? new Set(returnedPatchIds) : new Set([...current, ...returnedPatchIds])));
       setHoveredOverlayId(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Patch analysis failed.");
@@ -244,7 +319,7 @@ function App() {
   }
 
   async function handleAnalyze() {
-    await analyzeTargetPatches(effectiveSelectedPatches, globalAnalysisOptions);
+    await analyzeTargetPatches(effectiveSelectedPatches, globalAnalysisOptions, selectedPatchIds.size > 0);
   }
 
   async function handleAnalyzeFocusedPatch() {
@@ -286,6 +361,7 @@ function App() {
     setSelectedPatchIds(new Set());
     setViewMode("full");
     setFocusedPatchId(null);
+    setLastFocusedPatchId(null);
   }
 
   function handleTogglePatchSelectionMode() {
@@ -310,6 +386,7 @@ function App() {
   function handleFocusPatch(patchId: string) {
     setViewMode("patch");
     setFocusedPatchId(patchId);
+    setLastFocusedPatchId(patchId);
     setDeleteMode(false);
     setSelectPatchMode(false);
   }
@@ -333,6 +410,7 @@ function App() {
         ? (currentIndex - 1 + navigablePatches.length) % navigablePatches.length
         : (currentIndex + 1) % navigablePatches.length;
     setFocusedPatchId(navigablePatches[nextIndex].id);
+    setLastFocusedPatchId(navigablePatches[nextIndex].id);
   }
 
   function handleDeleteAllPatchOverlays(patchId: string) {
@@ -380,24 +458,29 @@ function App() {
           <div className="workspace-status">
             <div className="badge-strip">
               <span>{patches.length} patches</span>
-              <span>{activeOverlays.length} active overlays</span>
               <span>{effectiveSelectedPatchCount} selected</span>
               {focusedPatchId && focusedPatchPosition !== null ? (
                 <span>{focusedPatchPosition} / {navigablePatches.length || effectiveSelectedPatchCount}</span>
               ) : null}
             </div>
-            <label className="manual-count-inline">
-              못센 객체개수
-              <input
-                aria-label="Inline manual missed count"
-                disabled={!focusedPatchId}
-                inputMode="numeric"
-                placeholder="0"
-                type="number"
-                value={currentManualCount}
-                onChange={(event) => handleCurrentManualCountChange(event.target.value)}
-              />
-            </label>
+            <div className="manual-count-inline">
+              <label className="manual-count-field">
+                자동 세그먼트 개수
+                <input aria-label="Automatic segment count" disabled readOnly type="text" value={String(activeOverlays.length)} />
+              </label>
+              <label className="manual-count-field">
+                못센 객체개수
+                <input
+                  aria-label={viewMode === "full" ? "Total manual missed count" : "Inline manual missed count"}
+                  disabled={viewMode === "full" || !focusedPatchId}
+                  inputMode="numeric"
+                  placeholder="0"
+                  type="number"
+                  value={displayedManualCount}
+                  onChange={(event) => handleCurrentManualCountChange(event.target.value)}
+                />
+              </label>
+            </div>
           </div>
         </div>
 

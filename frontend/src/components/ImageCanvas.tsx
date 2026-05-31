@@ -280,7 +280,10 @@ function ImageCanvas({
                 key={overlay.globalId}
                 className={hoveredOverlayId === overlay.globalId ? "overlay-shape is-hovered" : "overlay-shape"}
                 points={overlay.localPoints}
-                style={{ ["--overlay-opacity" as string]: String(overlayOpacity) }}
+                style={{
+                  ["--overlay-opacity" as string]: String(overlayOpacity),
+                  pointerEvents: deleteMode ? "auto" : "none"
+                }}
                 onClick={(event) => {
                   if (!deleteMode) {
                     return;
@@ -300,7 +303,10 @@ function ImageCanvas({
             key={overlay.globalId}
             className={hoveredOverlayId === overlay.globalId ? "overlay-shape is-hovered" : "overlay-shape"}
             points={formatPoints(overlay.contour)}
-            style={{ ["--overlay-opacity" as string]: String(overlayOpacity) }}
+            style={{
+              ["--overlay-opacity" as string]: String(overlayOpacity),
+              pointerEvents: deleteMode ? "auto" : "none"
+            }}
             onClick={(event) => {
               if (!deleteMode) {
                 return;
