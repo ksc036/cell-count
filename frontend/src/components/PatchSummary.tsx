@@ -1,4 +1,3 @@
-import type { ChangeEvent } from "react";
 import type { Patch, PatchCountSummary, TotalCountSummary } from "../types";
 
 type PatchSummaryProps = {
@@ -10,13 +9,8 @@ type PatchSummaryProps = {
   onPatchOpen: (patchId: string) => void;
 };
 
-function PatchSummary({ patches, patchCounts, totalCounts, manualCounts, onManualCountChange, onPatchOpen }: PatchSummaryProps) {
+function PatchSummary({ patches, patchCounts, totalCounts, manualCounts: _manualCounts, onManualCountChange: _onManualCountChange, onPatchOpen }: PatchSummaryProps) {
   const patchMap = new Map(patchCounts.map((patchCount) => [patchCount.patchId, patchCount]));
-
-  function handleChange(patchId: string, event: ChangeEvent<HTMLInputElement>) {
-    const parsed = Number.parseInt(event.target.value || "0", 10);
-    onManualCountChange(patchId, Number.isNaN(parsed) || parsed < 0 ? 0 : parsed);
-  }
 
   return (
     <section className="panel summary-panel">
@@ -56,17 +50,6 @@ function PatchSummary({ patches, patchCounts, totalCounts, manualCounts, onManua
               <button type="button" onClick={() => onPatchOpen(patch.id)}>
                 Patch 상세 보기
               </button>
-              <label>
-                Manual add
-                <input
-                  aria-label={`${patch.label} manual count`}
-                  inputMode="numeric"
-                  min={0}
-                  type="number"
-                  value={manualCounts[patch.id] ?? 0}
-                  onChange={(event) => handleChange(patch.id, event)}
-                />
-              </label>
             </article>
           );
         })}

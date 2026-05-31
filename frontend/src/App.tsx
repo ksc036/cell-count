@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ControlPanel from "./components/ControlPanel";
 import ImageCanvas from "./components/ImageCanvas";
 import PatchSummary from "./components/PatchSummary";
@@ -78,11 +78,12 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("full");
   const [focusedPatchId, setFocusedPatchId] = useState<string | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.22);
-  const [analysisOptions, setAnalysisOptions] = useState<AnalyzeOptions>({
+  const [globalAnalysisOptions, setGlobalAnalysisOptions] = useState<AnalyzeOptions>({
     probThresh: 0.5,
     nmsThresh: 0.4,
     minArea: 0
   });
+  const [patchAnalysisOptionsById, setPatchAnalysisOptionsById] = useState<Record<string, AnalyzeOptions>>({});
 
   function resetAnalysisState() {
     setOverlayMap({});
@@ -90,6 +91,7 @@ function App() {
     setManualCounts({});
     setHoveredOverlayId(null);
     setAnalyzedPatchIds(new Set());
+    setPatchAnalysisOptionsById({});
   }
 
   const patches = useMemo(() => {
@@ -112,11 +114,57 @@ function App() {
     [patches, overlayMap, deletedOverlayIds, manualCounts]
   );
   const totalCounts = useMemo(() => summarizeTotals(patchCounts), [patchCounts]);
-  const selectedPatchCount = selectedPatchIds.size;
+  const effectiveSelectedPatches = useMemo(
+    () => (selectedPatchIds.size > 0 ? patches.filter((patch) => selectedPatchIds.has(patch.id)) : patches),
+    [patches, selectedPatchIds]
+  );
+  const effectiveSelectedPatchCount = effectiveSelectedPatches.length;
   const analyzedPatches = useMemo(
     () => patches.filter((patch) => analyzedPatchIds.has(patch.id)),
     [patches, analyzedPatchIds]
   );
+  const navigablePatches = useMemo(
+    () => effectiveSelectedPatches.filter((patch) => analyzedPatchIds.has(patch.id)),
+    [effectiveSelectedPatches, analyzedPatchIds]
+  );
+  const focusedPatchPosition = useMemo(() => {
+    if (!focusedPatchId) {
+      return null;
+    }
+    const currentIndex = navigablePatches.findIndex((patch) => patch.id === focusedPatchId);
+    return currentIndex === -1 ? null : currentIndex + 1;
+  }, [focusedPatchId, navigablePatches]);
+  const focusedPatchAnalysisOptions = useMemo(() => {
+    if (!focusedPatchId) {
+      return globalAnalysisOptions;
+    }
+    return {
+      ...globalAnalysisOptions,
+      ...(patchAnalysisOptionsById[focusedPatchId] ?? {})
+    };
+  }, [focusedPatchId, globalAnalysisOptions, patchAnalysisOptionsById]);
+  const currentManualCount = focusedPatchId ? String(manualCounts[focusedPatchId] ?? "") : "";
+
+  useEffect(() => {
+    if (viewMode !== "patch") {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) {
+        return;
+      }
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        handleFocusSiblingPatch("previous");
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        handleFocusSiblingPatch("next");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [viewMode, focusedPatchId, navigablePatches]);
 
   async function handleFileChange(file: File | null) {
     if (!file) {
@@ -157,7 +205,7 @@ function App() {
     setLines((current) => [...current, { id: nextLineId(), orientation, position }]);
   }
 
-  async function analyzeTargetPatches(targetPatches: typeof patches) {
+  async function analyzeTargetPatches(targetPatches: typeof patches, options: AnalyzeOptions) {
     if (!imageState) {
       setErrorMessage("Upload an image before running analysis.");
       return;
@@ -173,7 +221,7 @@ function App() {
     try {
       const sourceImage = await loadHtmlImage(imageState.url);
       const uploads = await createPatchUploads(sourceImage, targetPatches);
-      const response = await analyzePatches(API_BASE_URL, uploads, analysisOptions);
+      const response = await analyzePatches(API_BASE_URL, uploads, options);
       const incomingOverlayMap = mergePatchResultsByPatch(patches, response.patchResults);
       const returnedPatchIds = response.patchResults.map((result) => result.patchId);
       setOverlayMap((current) => replaceOverlayMap(current, incomingOverlayMap));
@@ -196,8 +244,7 @@ function App() {
   }
 
   async function handleAnalyze() {
-    const targetPatches = selectedPatchIds.size > 0 ? patches.filter((patch) => selectedPatchIds.has(patch.id)) : patches;
-    await analyzeTargetPatches(targetPatches);
+    await analyzeTargetPatches(effectiveSelectedPatches, globalAnalysisOptions);
   }
 
   async function handleAnalyzeFocusedPatch() {
@@ -206,7 +253,7 @@ function App() {
       setErrorMessage("Open a patch detail view before re-analyzing a single patch.");
       return;
     }
-    await analyzeTargetPatches([patch]);
+    await analyzeTargetPatches([patch], focusedPatchAnalysisOptions);
   }
 
   function handleDeleteOverlay(globalId: string) {
@@ -273,24 +320,53 @@ function App() {
   }
 
   function handleFocusSiblingPatch(direction: "previous" | "next") {
-    if (!focusedPatchId || analyzedPatches.length === 0) {
+    if (!focusedPatchId || navigablePatches.length === 0) {
       return;
     }
-    const currentIndex = analyzedPatches.findIndex((patch) => patch.id === focusedPatchId);
+    const currentIndex = navigablePatches.findIndex((patch) => patch.id === focusedPatchId);
     if (currentIndex === -1) {
-      setFocusedPatchId(analyzedPatches[0].id);
+      setFocusedPatchId(navigablePatches[0].id);
       return;
     }
     const nextIndex =
       direction === "previous"
-        ? (currentIndex - 1 + analyzedPatches.length) % analyzedPatches.length
-        : (currentIndex + 1) % analyzedPatches.length;
-    setFocusedPatchId(analyzedPatches[nextIndex].id);
+        ? (currentIndex - 1 + navigablePatches.length) % navigablePatches.length
+        : (currentIndex + 1) % navigablePatches.length;
+    setFocusedPatchId(navigablePatches[nextIndex].id);
   }
 
   function handleDeleteAllPatchOverlays(patchId: string) {
     const overlayIds = collectPatchOverlayIds(overlayMap, patchId);
     setDeletedOverlayIds((current) => new Set([...current, ...overlayIds]));
+  }
+
+  function handleFocusedPatchAnalysisOptionsChange(options: AnalyzeOptions) {
+    if (!focusedPatchId) {
+      return;
+    }
+    setPatchAnalysisOptionsById((current) => ({
+      ...current,
+      [focusedPatchId]: options
+    }));
+  }
+
+  function handleCurrentManualCountChange(value: string) {
+    if (!focusedPatchId) {
+      return;
+    }
+    const trimmed = value.trim();
+    setManualCounts((current) => {
+      if (trimmed === "") {
+        const next = { ...current };
+        delete next[focusedPatchId];
+        return next;
+      }
+      const parsed = Number.parseInt(trimmed, 10);
+      return {
+        ...current,
+        [focusedPatchId]: Number.isNaN(parsed) || parsed < 0 ? 0 : parsed
+      };
+    });
   }
 
   return (
@@ -301,10 +377,27 @@ function App() {
             <p className="eyebrow">Patch-aware StarDist workflow</p>
             <h1>Cell Count Review Studio</h1>
           </div>
-          <div className="badge-strip">
-            <span>{patches.length} patches</span>
-            <span>{activeOverlays.length} active overlays</span>
-            <span>{selectedPatchCount > 0 ? `${selectedPatchCount} selected` : "all patches"}</span>
+          <div className="workspace-status">
+            <div className="badge-strip">
+              <span>{patches.length} patches</span>
+              <span>{activeOverlays.length} active overlays</span>
+              <span>{effectiveSelectedPatchCount} selected</span>
+              {focusedPatchId && focusedPatchPosition !== null ? (
+                <span>{focusedPatchPosition} / {navigablePatches.length || effectiveSelectedPatchCount}</span>
+              ) : null}
+            </div>
+            <label className="manual-count-inline">
+              못센 객체개수
+              <input
+                aria-label="Inline manual missed count"
+                disabled={!focusedPatchId}
+                inputMode="numeric"
+                placeholder="0"
+                type="number"
+                value={currentManualCount}
+                onChange={(event) => handleCurrentManualCountChange(event.target.value)}
+              />
+            </label>
           </div>
         </div>
 
@@ -341,12 +434,16 @@ function App() {
           selectPatchMode={selectPatchMode}
           viewMode={viewMode}
           focusedPatchId={focusedPatchId}
-          selectedPatchCount={selectedPatchCount}
+          effectiveSelectedPatchCount={effectiveSelectedPatchCount}
+          focusedPatchPosition={focusedPatchPosition}
           isAnalyzing={isAnalyzing}
-          analysisOptions={analysisOptions}
+          globalAnalysisOptions={globalAnalysisOptions}
+          patchAnalysisOptions={focusedPatchAnalysisOptions}
           overlayOpacity={overlayOpacity}
+          currentManualCount={currentManualCount}
           onFileChange={handleFileChange}
-          onAnalysisOptionsChange={setAnalysisOptions}
+          onGlobalAnalysisOptionsChange={setGlobalAnalysisOptions}
+          onPatchAnalysisOptionsChange={handleFocusedPatchAnalysisOptionsChange}
           onPlacementModeChange={handlePlacementModeChange}
           onToggleDeleteMode={handleToggleDeleteMode}
           onTogglePatchSelectionMode={handleTogglePatchSelectionMode}
@@ -361,6 +458,7 @@ function App() {
             focusedPatchId ? () => handleDeleteAllPatchOverlays(focusedPatchId) : undefined
           }
           onAnalyzeFocusedPatch={focusedPatchId ? handleAnalyzeFocusedPatch : undefined}
+          onCurrentManualCountChange={handleCurrentManualCountChange}
         />
 
         {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}

@@ -74,6 +74,13 @@ body {
   gap: 10px;
 }
 
+.workspace-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
 .badge-strip span,
 .totals-card span,
 .totals-card strong {
@@ -168,6 +175,21 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.manual-count-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+}
+
+.manual-count-inline input {
+  width: 96px;
+  padding: 8px 10px;
+  border: 1px solid rgba(16, 36, 63, 0.16);
+  border-radius: 12px;
+  background: white;
 }
 
 .helper-copy {
