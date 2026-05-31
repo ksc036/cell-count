@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import type { DividerLine, GlobalOverlay, LineOrientation, Patch, ViewMode } from "../types";
 
 type ImageState = {
@@ -36,6 +36,10 @@ function formatPoints(points: GlobalOverlay["contour"]) {
   return points.map((point) => `${point.x},${point.y}`).join(" ");
 }
 
+function formatLocalPoints(points: GlobalOverlay["contour"], patch: Patch) {
+  return points.map((point) => `${point.x - patch.x},${point.y - patch.y}`).join(" ");
+}
+
 function ImageCanvas({
   imageState,
   patches,
@@ -59,6 +63,73 @@ function ImageCanvas({
   onPatchToggle,
   onPatchFocus
 }: ImageCanvasProps) {
+  const [detailImageUrl, setDetailImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!imageState || !focusedPatch || viewMode !== "patch") {
+      setDetailImageUrl((current) => {
+        if (current) {
+          URL.revokeObjectURL(current);
+        }
+        return null;
+      });
+      return;
+    }
+
+    let disposed = false;
+    let nextUrl: string | null = null;
+    const image = new Image();
+    image.src = imageState.url;
+
+    image
+      .decode()
+      .then(() => {
+        if (disposed) {
+          return;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = focusedPatch.width;
+        canvas.height = focusedPatch.height;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          return;
+        }
+        context.drawImage(
+          image,
+          focusedPatch.x,
+          focusedPatch.y,
+          focusedPatch.width,
+          focusedPatch.height,
+          0,
+          0,
+          focusedPatch.width,
+          focusedPatch.height
+        );
+        canvas.toBlob((blob) => {
+          if (disposed || !blob) {
+            return;
+          }
+          nextUrl = URL.createObjectURL(blob);
+          setDetailImageUrl((current) => {
+            if (current) {
+              URL.revokeObjectURL(current);
+            }
+            return nextUrl;
+          });
+        }, "image/png");
+      })
+      .catch(() => {
+        setDetailImageUrl(null);
+      });
+
+    return () => {
+      disposed = true;
+      if (nextUrl) {
+        URL.revokeObjectURL(nextUrl);
+      }
+    };
+  }, [imageState, focusedPatch, viewMode]);
+
   function getImagePosition(event: MouseEvent<SVGSVGElement>) {
     if (!imageState) {
       return null;
@@ -107,9 +178,18 @@ function ImageCanvas({
   const visiblePatch = viewMode === "patch" ? focusedPatch : null;
   const visibleOverlays = visiblePatch ? overlays.filter((overlay) => overlay.patchId === visiblePatch.id) : overlays;
   const visiblePatches = visiblePatch ? [visiblePatch] : patches;
+  const detailOverlays = useMemo(() => {
+    if (!visiblePatch) {
+      return [] as Array<GlobalOverlay & { localPoints: string }>;
+    }
+    return visibleOverlays.map((overlay) => ({
+      ...overlay,
+      localPoints: formatLocalPoints(overlay.contour, visiblePatch)
+    }));
+  }, [visibleOverlays, visiblePatch]);
   const viewBox =
     visiblePatch && imageState
-      ? `${visiblePatch.x} ${visiblePatch.y} ${visiblePatch.width} ${visiblePatch.height}`
+      ? `0 0 ${visiblePatch.width} ${visiblePatch.height}`
       : imageState
         ? `0 0 ${imageState.width} ${imageState.height}`
         : "0 0 0 0";
@@ -124,9 +204,16 @@ function ImageCanvas({
         onMouseLeave={handleMouseLeave}
         onMouseMove={handleMouseMove}
       >
-        <image height={imageState.height} href={imageState.url} width={imageState.width} x={0} y={0} />
+        {visiblePatch ? (
+          detailImageUrl ? (
+            <image height={visiblePatch.height} href={detailImageUrl} width={visiblePatch.width} x={0} y={0} />
+          ) : null
+        ) : (
+          <image height={imageState.height} href={imageState.url} width={imageState.width} x={0} y={0} />
+        )}
 
-        {visiblePatches.map((patch) => {
+        {viewMode === "full"
+          ? visiblePatches.map((patch) => {
           const isSelected = selectedPatchIds.has(patch.id);
           const isHovered = hoveredPatchId === patch.id;
           const showLabel = selectPatchMode && (isHovered || isSelected);
@@ -170,7 +257,8 @@ function ImageCanvas({
               ) : null}
             </g>
           );
-        })}
+        })
+          : null}
 
         {viewMode === "full"
           ? lines.map((line) =>
@@ -189,7 +277,28 @@ function ImageCanvas({
           <line className="preview-line" x1={previewPosition} x2={previewPosition} y1={0} y2={imageState.height} />
         ) : null}
 
-        {visibleOverlays.map((overlay) => (
+        {visiblePatch
+          ? detailOverlays.map((overlay) => (
+              <polygon
+                key={overlay.globalId}
+                className={hoveredOverlayId === overlay.globalId ? "overlay-shape is-hovered" : "overlay-shape"}
+                points={overlay.localPoints}
+                style={{ ["--overlay-opacity" as string]: String(overlayOpacity) }}
+                onClick={(event) => {
+                  if (!deleteMode) {
+                    return;
+                  }
+                  event.stopPropagation();
+                  onOverlayDelete(overlay.globalId);
+                }}
+                onMouseEnter={() => {
+                  if (deleteMode) {
+                    onOverlayHover(overlay.globalId);
+                  }
+                }}
+              />
+            ))
+          : visibleOverlays.map((overlay) => (
           <polygon
             key={overlay.globalId}
             className={hoveredOverlayId === overlay.globalId ? "overlay-shape is-hovered" : "overlay-shape"}
@@ -208,7 +317,7 @@ function ImageCanvas({
               }
             }}
           />
-        ))}
+            ))}
       </svg>
     </section>
   );
