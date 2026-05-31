@@ -66,6 +66,7 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectPatchMode, setSelectPatchMode] = useState(false);
   const [selectedPatchIds, setSelectedPatchIds] = useState<Set<string>>(new Set());
+  const [analyzedPatchIds, setAnalyzedPatchIds] = useState<Set<string>>(new Set());
   const [hoveredPatchId, setHoveredPatchId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("full");
   const [focusedPatchId, setFocusedPatchId] = useState<string | null>(null);
@@ -81,6 +82,7 @@ function App() {
     setDeletedOverlayIds(new Set());
     setManualCounts({});
     setHoveredOverlayId(null);
+    setAnalyzedPatchIds(new Set());
   }
 
   const patches = useMemo(() => {
@@ -173,6 +175,7 @@ function App() {
         }
         return next;
       });
+      setAnalyzedPatchIds((current) => new Set([...current, ...returnedPatchIds]));
       setHoveredOverlayId(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Patch analysis failed.");
@@ -336,7 +339,7 @@ function App() {
         {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}
 
         <PatchSummary
-          patches={patches}
+          patches={patches.filter((patch) => analyzedPatchIds.has(patch.id))}
           patchCounts={patchCounts}
           totalCounts={totalCounts}
           manualCounts={manualCounts}

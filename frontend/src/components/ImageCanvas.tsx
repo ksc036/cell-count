@@ -106,6 +106,7 @@ function ImageCanvas({
 
   const visiblePatch = viewMode === "patch" ? focusedPatch : null;
   const visibleOverlays = visiblePatch ? overlays.filter((overlay) => overlay.patchId === visiblePatch.id) : overlays;
+  const visiblePatches = visiblePatch ? [visiblePatch] : patches;
   const viewBox =
     visiblePatch && imageState
       ? `${visiblePatch.x} ${visiblePatch.y} ${visiblePatch.width} ${visiblePatch.height}`
@@ -125,7 +126,7 @@ function ImageCanvas({
       >
         <image height={imageState.height} href={imageState.url} width={imageState.width} x={0} y={0} />
 
-        {patches.map((patch) => {
+        {visiblePatches.map((patch) => {
           const isSelected = selectedPatchIds.has(patch.id);
           const isHovered = hoveredPatchId === patch.id;
           const showLabel = selectPatchMode && (isHovered || isSelected);
@@ -171,13 +172,15 @@ function ImageCanvas({
           );
         })}
 
-        {lines.map((line) =>
-          line.orientation === "horizontal" ? (
-            <line key={line.id} className="divider-line" x1={0} x2={imageState.width} y1={line.position} y2={line.position} />
-          ) : (
-            <line key={line.id} className="divider-line" x1={line.position} x2={line.position} y1={0} y2={imageState.height} />
-          )
-        )}
+        {viewMode === "full"
+          ? lines.map((line) =>
+              line.orientation === "horizontal" ? (
+                <line key={line.id} className="divider-line" x1={0} x2={imageState.width} y1={line.position} y2={line.position} />
+              ) : (
+                <line key={line.id} className="divider-line" x1={line.position} x2={line.position} y1={0} y2={imageState.height} />
+              )
+            )
+          : null}
 
         {previewPosition !== null && placementMode === "horizontal" ? (
           <line className="preview-line" x1={0} x2={imageState.width} y1={previewPosition} y2={previewPosition} />
