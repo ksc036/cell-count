@@ -57,7 +57,11 @@ async def analyze(request: Request) -> AnalyzeResponse:
                 prob_thresh=metadata.options.prob_thresh,
                 nms_thresh=metadata.options.nms_thresh,
             )
-            overlays = overlays_from_labels(labels)
+            overlays = overlays_from_labels(
+                labels,
+                min_area=metadata.options.min_area,
+                max_area=metadata.options.max_area,
+            )
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except ValueError as exc:

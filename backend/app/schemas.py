@@ -32,6 +32,7 @@ class AnalyzeOptions(BaseModel):
     prob_thresh: float = Field(default=0.5, alias="probThresh")
     nms_thresh: float = Field(default=0.4, alias="nmsThresh")
     min_area: int = Field(default=0, alias="minArea")
+    max_area: Optional[int] = Field(default=None, alias="maxArea")
 
 
 class AnalyzeMetadata(BaseModel):

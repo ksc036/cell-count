@@ -12,7 +12,8 @@ export async function analyzePatches(
       channelMode: options.channelMode ?? "average",
       probThresh: options.probThresh ?? 0.5,
       nmsThresh: options.nmsThresh ?? 0.4,
-      minArea: options.minArea ?? 0
+      minArea: options.minArea ?? 0,
+      maxArea: options.maxArea
     },
     patches: patches.map((patch) => ({
       patchId: patch.patchId,

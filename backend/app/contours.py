@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 import cv2
 import numpy as np
 
@@ -10,7 +12,7 @@ def _contour_points(contour: np.ndarray) -> list[Point]:
     return [Point(x=float(point[0][0]), y=float(point[0][1])) for point in contour]
 
 
-def overlays_from_labels(labels: np.ndarray) -> list[PatchOverlay]:
+def overlays_from_labels(labels: np.ndarray, min_area: int = 0, max_area: Optional[int] = None) -> list[PatchOverlay]:
     overlays: list[PatchOverlay] = []
     for object_id in [value for value in np.unique(labels) if value > 0]:
         mask = (labels == object_id).astype(np.uint8)
@@ -19,6 +21,11 @@ def overlays_from_labels(labels: np.ndarray) -> list[PatchOverlay]:
             continue
 
         contour = max(contours, key=cv2.contourArea)
+        area = cv2.contourArea(contour)
+        if area < min_area:
+            continue
+        if max_area is not None and area > max_area:
+            continue
         x, y, width, height = cv2.boundingRect(contour)
         moments = cv2.moments(contour)
         if moments["m00"] == 0:

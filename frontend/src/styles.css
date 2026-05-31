@@ -134,6 +134,26 @@ body {
   gap: 10px;
 }
 
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.input-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-grid input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(16, 36, 63, 0.16);
+  border-radius: 12px;
+  background: white;
+}
+
 .file-picker {
   display: inline-flex;
   align-items: center;

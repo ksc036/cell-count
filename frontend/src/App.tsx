@@ -6,7 +6,7 @@ import { analyzePatches } from "./lib/api";
 import { createPatchUploads } from "./lib/cropImage";
 import { buildPatches } from "./lib/patches";
 import { mergePatchResults, summarizePatchCounts, summarizeTotals } from "./lib/overlays";
-import type { DividerLine, GlobalOverlay, LineOrientation } from "./types";
+import type { AnalyzeOptions, DividerLine, GlobalOverlay, LineOrientation } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -57,6 +57,11 @@ function App() {
   const [deleteMode, setDeleteMode] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [analysisOptions, setAnalysisOptions] = useState<AnalyzeOptions>({
+    probThresh: 0.5,
+    nmsThresh: 0.4,
+    minArea: 0
+  });
 
   function resetAnalysisState() {
     setGlobalOverlays([]);
@@ -121,7 +126,7 @@ function App() {
     try {
       const sourceImage = await loadHtmlImage(imageState.url);
       const uploads = await createPatchUploads(sourceImage, patches);
-      const response = await analyzePatches(API_BASE_URL, uploads);
+      const response = await analyzePatches(API_BASE_URL, uploads, analysisOptions);
       setGlobalOverlays(mergePatchResults(patches, response.patchResults));
       setDeletedOverlayIds(new Set());
       setHoveredOverlayId(null);
@@ -194,7 +199,9 @@ function App() {
           placementMode={placementMode}
           deleteMode={deleteMode}
           isAnalyzing={isAnalyzing}
+          analysisOptions={analysisOptions}
           onFileChange={handleFileChange}
+          onAnalysisOptionsChange={setAnalysisOptions}
           onPlacementModeChange={handlePlacementModeChange}
           onToggleDeleteMode={handleToggleDeleteMode}
           onClearLines={handleClearLines}

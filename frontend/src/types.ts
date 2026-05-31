@@ -45,6 +45,7 @@ export type AnalyzeOptions = {
   probThresh?: number;
   nmsThresh?: number;
   minArea?: number;
+  maxArea?: number;
 };
 
 export type PatchLocalOverlay = {
