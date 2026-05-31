@@ -7,3 +7,6 @@ backend/__pycache__
 backend/app/__pycache__
 *.pyc
 .venv
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
