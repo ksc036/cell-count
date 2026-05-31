@@ -84,6 +84,8 @@ The user uploads an image, draws horizontal and vertical divider lines to split 
 - Load and normalize each uploaded patch image.
 - Accept patch metadata from the client.
 - Run StarDist on each uploaded patch image.
+- Use `labels, details = model.predict_instances(normalize(img))` as the prediction path.
+- Derive per-object contour geometry, bounding boxes, and centroids from the predicted instance labels.
 - Return patch-local overlay geometry and metadata for each patch.
 
 ### Frontend Responsibilities
@@ -127,10 +129,12 @@ Suggested labels:
 
 The backend returns overlays in patch-local coordinates. The client is responsible for converting them into original-image coordinates by adding the patch origin offset.
 
+StarDist does not need to be treated as if it directly returns simple frontend triangles or boxes. In practice, version 1 should use the instance-label output from `predict_instances(...)` and extract one contour per detected object for client rendering and hit-testing.
+
 Each patch-local overlay should include:
 
 - `id`
-- `polygon`: list of points in patch-local coordinates
+- `contour`: list of boundary points in patch-local coordinates
 - `bbox`: `{ x, y, width, height }` in patch-local coordinates
 - `centroid`: `{ x, y }` in patch-local coordinates
 
@@ -139,7 +143,7 @@ The client should wrap each returned overlay with:
 - `globalId`
 - `patchId`
 - `sourceOverlayId`
-- `polygon` in original-image coordinates
+- `contour` in original-image coordinates
 - `bbox` in original-image coordinates
 - `centroid` in original-image coordinates
 
@@ -204,7 +208,15 @@ Response:
       "overlays": [
         {
           "id": "ov-1",
-          "polygon": [{ "x": 10, "y": 12 }, { "x": 18, "y": 12 }, { "x": 18, "y": 20 }],
+          "contour": [
+            { "x": 10, "y": 12 },
+            { "x": 12, "y": 10 },
+            { "x": 16, "y": 10 },
+            { "x": 18, "y": 13 },
+            { "x": 17, "y": 18 },
+            { "x": 12, "y": 19 },
+            { "x": 9, "y": 16 }
+          ],
           "bbox": { "x": 10, "y": 12, "width": 8, "height": 8 },
           "centroid": { "x": 14, "y": 16 }
         }
