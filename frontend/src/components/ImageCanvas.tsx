@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import type { DividerLine, GlobalOverlay, LineOrientation, Patch, ViewMode } from "../types";
 
 type ImageState = {
@@ -167,6 +167,22 @@ function ImageCanvas({
     onCommitLine(placementMode === "horizontal" ? position.y : position.x);
   }
 
+  const visiblePatch = viewMode === "patch" ? focusedPatch : null;
+  const visibleOverlays = visiblePatch ? overlays.filter((overlay) => overlay.patchId === visiblePatch.id) : overlays;
+  const visiblePatches = visiblePatch ? [visiblePatch] : patches;
+  const detailOverlays = visiblePatch
+    ? visibleOverlays.map((overlay) => ({
+        ...overlay,
+        localPoints: formatLocalPoints(overlay.contour, visiblePatch)
+      }))
+    : ([] as Array<GlobalOverlay & { localPoints: string }>);
+  const viewBox =
+    visiblePatch && imageState
+      ? `0 0 ${visiblePatch.width} ${visiblePatch.height}`
+      : imageState
+        ? `0 0 ${imageState.width} ${imageState.height}`
+        : "0 0 0 0";
+
   if (!imageState) {
     return (
       <section className="canvas-shell canvas-empty">
@@ -174,25 +190,6 @@ function ImageCanvas({
       </section>
     );
   }
-
-  const visiblePatch = viewMode === "patch" ? focusedPatch : null;
-  const visibleOverlays = visiblePatch ? overlays.filter((overlay) => overlay.patchId === visiblePatch.id) : overlays;
-  const visiblePatches = visiblePatch ? [visiblePatch] : patches;
-  const detailOverlays = useMemo(() => {
-    if (!visiblePatch) {
-      return [] as Array<GlobalOverlay & { localPoints: string }>;
-    }
-    return visibleOverlays.map((overlay) => ({
-      ...overlay,
-      localPoints: formatLocalPoints(overlay.contour, visiblePatch)
-    }));
-  }, [visibleOverlays, visiblePatch]);
-  const viewBox =
-    visiblePatch && imageState
-      ? `0 0 ${visiblePatch.width} ${visiblePatch.height}`
-      : imageState
-        ? `0 0 ${imageState.width} ${imageState.height}`
-        : "0 0 0 0";
 
   return (
     <section className="canvas-shell">
