@@ -39,6 +39,14 @@ export type PatchUpload = {
   height: number;
 };
 
+export type AnalyzeOptions = {
+  modelName?: string;
+  channelMode?: "average" | "red" | "green" | "blue";
+  probThresh?: number;
+  nmsThresh?: number;
+  minArea?: number;
+};
+
 export type PatchLocalOverlay = {
   id: string;
   contour: Point[];

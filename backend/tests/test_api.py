@@ -37,7 +37,13 @@ def test_analyze_requires_metadata() -> None:
 
 
 def test_analyze_returns_patch_results(monkeypatch) -> None:
-    def fake_analyze_patch_image(image: np.ndarray) -> np.ndarray:
+    def fake_analyze_patch_image(
+        image: np.ndarray,
+        model_name: str | None = None,
+        channel_mode: str = "average",
+        prob_thresh: float = 0.5,
+        nms_thresh: float = 0.4,
+    ) -> np.ndarray:
         labels = np.zeros_like(image, dtype=np.uint16)
         labels[1:4, 1:4] = 1
         return labels
@@ -74,7 +80,10 @@ def test_analyze_returns_patch_results(monkeypatch) -> None:
 
 
 def test_analyze_reports_missing_patch(monkeypatch) -> None:
-    monkeypatch.setattr("app.main.analyze_patch_image", lambda image: image)
+    monkeypatch.setattr(
+        "app.main.analyze_patch_image",
+        lambda image, model_name=None, channel_mode="average", prob_thresh=0.5, nms_thresh=0.4: image,
+    )
     metadata = {
         "patches": [
             {

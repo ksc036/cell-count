@@ -50,7 +50,13 @@ async def analyze(request: Request) -> AnalyzeResponse:
 
         try:
             image = load_patch_image(file_bytes, upload.filename or patch.file_field)
-            labels = analyze_patch_image(image)
+            labels = analyze_patch_image(
+                image,
+                model_name=metadata.options.model_name,
+                channel_mode=metadata.options.channel_mode,
+                prob_thresh=metadata.options.prob_thresh,
+                nms_thresh=metadata.options.nms_thresh,
+            )
             overlays = overlays_from_labels(labels)
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
