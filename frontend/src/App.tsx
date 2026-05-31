@@ -113,6 +113,10 @@ function App() {
   );
   const totalCounts = useMemo(() => summarizeTotals(patchCounts), [patchCounts]);
   const selectedPatchCount = selectedPatchIds.size;
+  const analyzedPatches = useMemo(
+    () => patches.filter((patch) => analyzedPatchIds.has(patch.id)),
+    [patches, analyzedPatchIds]
+  );
 
   async function handleFileChange(file: File | null) {
     if (!file) {
@@ -269,18 +273,19 @@ function App() {
   }
 
   function handleFocusSiblingPatch(direction: "previous" | "next") {
-    if (!focusedPatchId || patches.length === 0) {
+    if (!focusedPatchId || analyzedPatches.length === 0) {
       return;
     }
-    const currentIndex = patches.findIndex((patch) => patch.id === focusedPatchId);
+    const currentIndex = analyzedPatches.findIndex((patch) => patch.id === focusedPatchId);
     if (currentIndex === -1) {
+      setFocusedPatchId(analyzedPatches[0].id);
       return;
     }
     const nextIndex =
       direction === "previous"
-        ? (currentIndex - 1 + patches.length) % patches.length
-        : (currentIndex + 1) % patches.length;
-    setFocusedPatchId(patches[nextIndex].id);
+        ? (currentIndex - 1 + analyzedPatches.length) % analyzedPatches.length
+        : (currentIndex + 1) % analyzedPatches.length;
+    setFocusedPatchId(analyzedPatches[nextIndex].id);
   }
 
   function handleDeleteAllPatchOverlays(patchId: string) {
@@ -361,7 +366,7 @@ function App() {
         {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}
 
         <PatchSummary
-          patches={patches.filter((patch) => analyzedPatchIds.has(patch.id))}
+          patches={analyzedPatches}
           patchCounts={patchCounts}
           totalCounts={totalCounts}
           manualCounts={manualCounts}
