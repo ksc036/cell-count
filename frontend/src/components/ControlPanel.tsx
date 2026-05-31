@@ -25,6 +25,7 @@ type ControlPanelProps = {
   onFocusPreviousPatch: () => void;
   onFocusNextPatch: () => void;
   onDeleteAllPatchOverlays?: () => void;
+  onAnalyzeFocusedPatch?: () => void;
 };
 
 function ControlPanel({
@@ -50,7 +51,8 @@ function ControlPanel({
   onReturnToFullView,
   onFocusPreviousPatch,
   onFocusNextPatch,
-  onDeleteAllPatchOverlays
+  onDeleteAllPatchOverlays,
+  onAnalyzeFocusedPatch
 }: ControlPanelProps) {
   function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
@@ -218,6 +220,9 @@ function ControlPanel({
           />
         </label>
         <div className="button-grid">
+          <button disabled={!focusedPatchId || isAnalyzing} type="button" onClick={onAnalyzeFocusedPatch}>
+            현재 Patch만 재분석
+          </button>
           <button disabled={!focusedPatchId} type="button" onClick={onDeleteAllPatchOverlays}>
             해당 Patch 전체 세그먼트 제거
           </button>

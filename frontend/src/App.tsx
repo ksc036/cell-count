@@ -52,6 +52,13 @@ async function loadHtmlImage(url: string): Promise<HTMLImageElement> {
   return img;
 }
 
+function getPatchById(patches: ReturnType<typeof buildPatches>, patchId: string | null) {
+  if (!patchId) {
+    return null;
+  }
+  return patches.find((patch) => patch.id === patchId) ?? null;
+}
+
 function App() {
   const [imageState, setImageState] = useState<ImageState | null>(null);
   const [lines, setLines] = useState<DividerLine[]>([]);
@@ -98,10 +105,7 @@ function App() {
     [flatOverlays, deletedOverlayIds]
   );
 
-  const focusedPatch = useMemo(
-    () => patches.find((patch) => patch.id === focusedPatchId) ?? null,
-    [patches, focusedPatchId]
-  );
+  const focusedPatch = useMemo(() => getPatchById(patches, focusedPatchId), [patches, focusedPatchId]);
 
   const patchCounts = useMemo(
     () => summarizePatchCounts(patches, overlayMap, deletedOverlayIds, manualCounts),
@@ -149,9 +153,13 @@ function App() {
     setLines((current) => [...current, { id: nextLineId(), orientation, position }]);
   }
 
-  async function handleAnalyze() {
+  async function analyzeTargetPatches(targetPatches: typeof patches) {
     if (!imageState) {
       setErrorMessage("Upload an image before running analysis.");
+      return;
+    }
+    if (targetPatches.length === 0) {
+      setErrorMessage("Choose at least one patch to analyze.");
       return;
     }
 
@@ -160,7 +168,6 @@ function App() {
 
     try {
       const sourceImage = await loadHtmlImage(imageState.url);
-      const targetPatches = selectedPatchIds.size > 0 ? patches.filter((patch) => selectedPatchIds.has(patch.id)) : patches;
       const uploads = await createPatchUploads(sourceImage, targetPatches);
       const response = await analyzePatches(API_BASE_URL, uploads, analysisOptions);
       const incomingOverlayMap = mergePatchResultsByPatch(patches, response.patchResults);
@@ -182,6 +189,20 @@ function App() {
     } finally {
       setIsAnalyzing(false);
     }
+  }
+
+  async function handleAnalyze() {
+    const targetPatches = selectedPatchIds.size > 0 ? patches.filter((patch) => selectedPatchIds.has(patch.id)) : patches;
+    await analyzeTargetPatches(targetPatches);
+  }
+
+  async function handleAnalyzeFocusedPatch() {
+    const patch = getPatchById(patches, focusedPatchId);
+    if (!patch) {
+      setErrorMessage("Open a patch detail view before re-analyzing a single patch.");
+      return;
+    }
+    await analyzeTargetPatches([patch]);
   }
 
   function handleDeleteOverlay(globalId: string) {
@@ -334,6 +355,7 @@ function App() {
           onDeleteAllPatchOverlays={
             focusedPatchId ? () => handleDeleteAllPatchOverlays(focusedPatchId) : undefined
           }
+          onAnalyzeFocusedPatch={focusedPatchId ? handleAnalyzeFocusedPatch : undefined}
         />
 
         {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}
