@@ -5,8 +5,15 @@ import PatchSummary from "./components/PatchSummary";
 import { analyzePatches } from "./lib/api";
 import { createPatchUploads } from "./lib/cropImage";
 import { buildPatches } from "./lib/patches";
-import { mergePatchResults, summarizePatchCounts, summarizeTotals } from "./lib/overlays";
-import type { AnalyzeOptions, DividerLine, GlobalOverlay, LineOrientation } from "./types";
+import {
+  collectPatchOverlayIds,
+  flattenOverlayMap,
+  mergePatchResultsByPatch,
+  replaceOverlayMap,
+  summarizePatchCounts,
+  summarizeTotals
+} from "./lib/overlays";
+import type { AnalyzeOptions, DividerLine, LineOrientation, OverlayMap, ViewMode } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -50,13 +57,19 @@ function App() {
   const [lines, setLines] = useState<DividerLine[]>([]);
   const [placementMode, setPlacementMode] = useState<LineOrientation | null>(null);
   const [previewPosition, setPreviewPosition] = useState<number | null>(null);
-  const [globalOverlays, setGlobalOverlays] = useState<GlobalOverlay[]>([]);
+  const [overlayMap, setOverlayMap] = useState<OverlayMap>({});
   const [deletedOverlayIds, setDeletedOverlayIds] = useState<Set<string>>(new Set());
   const [manualCounts, setManualCounts] = useState<Record<string, number>>({});
   const [hoveredOverlayId, setHoveredOverlayId] = useState<string | null>(null);
   const [deleteMode, setDeleteMode] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectPatchMode, setSelectPatchMode] = useState(false);
+  const [selectedPatchIds, setSelectedPatchIds] = useState<Set<string>>(new Set());
+  const [hoveredPatchId, setHoveredPatchId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("full");
+  const [focusedPatchId, setFocusedPatchId] = useState<string | null>(null);
+  const [overlayOpacity, setOverlayOpacity] = useState(0.22);
   const [analysisOptions, setAnalysisOptions] = useState<AnalyzeOptions>({
     probThresh: 0.5,
     nmsThresh: 0.4,
@@ -64,7 +77,7 @@ function App() {
   });
 
   function resetAnalysisState() {
-    setGlobalOverlays([]);
+    setOverlayMap({});
     setDeletedOverlayIds(new Set());
     setManualCounts({});
     setHoveredOverlayId(null);
@@ -77,11 +90,23 @@ function App() {
     return buildPatches(imageState.width, imageState.height, lines);
   }, [imageState, lines]);
 
+  const flatOverlays = useMemo(() => flattenOverlayMap(overlayMap), [overlayMap]);
+  const activeOverlays = useMemo(
+    () => flatOverlays.filter((overlay) => !deletedOverlayIds.has(overlay.globalId)),
+    [flatOverlays, deletedOverlayIds]
+  );
+
+  const focusedPatch = useMemo(
+    () => patches.find((patch) => patch.id === focusedPatchId) ?? null,
+    [patches, focusedPatchId]
+  );
+
   const patchCounts = useMemo(
-    () => summarizePatchCounts(patches, globalOverlays, deletedOverlayIds, manualCounts),
-    [patches, globalOverlays, deletedOverlayIds, manualCounts]
+    () => summarizePatchCounts(patches, overlayMap, deletedOverlayIds, manualCounts),
+    [patches, overlayMap, deletedOverlayIds, manualCounts]
   );
   const totalCounts = useMemo(() => summarizeTotals(patchCounts), [patchCounts]);
+  const selectedPatchCount = selectedPatchIds.size;
 
   async function handleFileChange(file: File | null) {
     if (!file) {
@@ -100,6 +125,11 @@ function App() {
       setPreviewPosition(null);
       resetAnalysisState();
       setDeleteMode(false);
+      setSelectPatchMode(false);
+      setSelectedPatchIds(new Set());
+      setHoveredPatchId(null);
+      setViewMode("full");
+      setFocusedPatchId(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load the selected image.");
     }
@@ -111,6 +141,9 @@ function App() {
       return;
     }
     resetAnalysisState();
+    setSelectedPatchIds(new Set());
+    setViewMode("full");
+    setFocusedPatchId(null);
     setLines((current) => [...current, { id: nextLineId(), orientation, position }]);
   }
 
@@ -125,10 +158,21 @@ function App() {
 
     try {
       const sourceImage = await loadHtmlImage(imageState.url);
-      const uploads = await createPatchUploads(sourceImage, patches);
+      const targetPatches = selectedPatchIds.size > 0 ? patches.filter((patch) => selectedPatchIds.has(patch.id)) : patches;
+      const uploads = await createPatchUploads(sourceImage, targetPatches);
       const response = await analyzePatches(API_BASE_URL, uploads, analysisOptions);
-      setGlobalOverlays(mergePatchResults(patches, response.patchResults));
-      setDeletedOverlayIds(new Set());
+      const incomingOverlayMap = mergePatchResultsByPatch(patches, response.patchResults);
+      const returnedPatchIds = response.patchResults.map((result) => result.patchId);
+      setOverlayMap((current) => replaceOverlayMap(current, incomingOverlayMap));
+      setDeletedOverlayIds((current) => {
+        const next = new Set(current);
+        for (const patchId of returnedPatchIds) {
+          for (const overlayId of collectPatchOverlayIds(overlayMap, patchId)) {
+            next.delete(overlayId);
+          }
+        }
+        return next;
+      });
       setHoveredOverlayId(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Patch analysis failed.");
@@ -151,17 +195,73 @@ function App() {
 
   function handlePlacementModeChange(mode: LineOrientation | null) {
     setDeleteMode(false);
+    setSelectPatchMode(false);
     setPlacementMode(mode);
   }
 
   function handleToggleDeleteMode() {
     setPlacementMode(null);
+    setSelectPatchMode(false);
     setDeleteMode((current) => !current);
   }
 
   function handleClearLines() {
     setLines([]);
     resetAnalysisState();
+    setSelectedPatchIds(new Set());
+    setViewMode("full");
+    setFocusedPatchId(null);
+  }
+
+  function handleTogglePatchSelectionMode() {
+    setPlacementMode(null);
+    setDeleteMode(false);
+    setSelectPatchMode((current) => !current);
+    setHoveredPatchId(null);
+  }
+
+  function handlePatchToggle(patchId: string) {
+    setSelectedPatchIds((current) => {
+      const next = new Set(current);
+      if (next.has(patchId)) {
+        next.delete(patchId);
+      } else {
+        next.add(patchId);
+      }
+      return next;
+    });
+  }
+
+  function handleFocusPatch(patchId: string) {
+    setViewMode("patch");
+    setFocusedPatchId(patchId);
+    setDeleteMode(false);
+    setSelectPatchMode(false);
+  }
+
+  function handleReturnToFullView() {
+    setViewMode("full");
+    setFocusedPatchId(null);
+  }
+
+  function handleFocusSiblingPatch(direction: "previous" | "next") {
+    if (!focusedPatchId || patches.length === 0) {
+      return;
+    }
+    const currentIndex = patches.findIndex((patch) => patch.id === focusedPatchId);
+    if (currentIndex === -1) {
+      return;
+    }
+    const nextIndex =
+      direction === "previous"
+        ? (currentIndex - 1 + patches.length) % patches.length
+        : (currentIndex + 1) % patches.length;
+    setFocusedPatchId(patches[nextIndex].id);
+  }
+
+  function handleDeleteAllPatchOverlays(patchId: string) {
+    const overlayIds = collectPatchOverlayIds(overlayMap, patchId);
+    setDeletedOverlayIds((current) => new Set([...current, ...overlayIds]));
   }
 
   return (
@@ -174,22 +274,33 @@ function App() {
           </div>
           <div className="badge-strip">
             <span>{patches.length} patches</span>
-            <span>{globalOverlays.length - deletedOverlayIds.size} active overlays</span>
+            <span>{activeOverlays.length} active overlays</span>
+            <span>{selectedPatchCount > 0 ? `${selectedPatchCount} selected` : "all patches"}</span>
           </div>
         </div>
 
         <ImageCanvas
           imageState={imageState}
           lines={lines}
-          overlays={globalOverlays.filter((overlay) => !deletedOverlayIds.has(overlay.globalId))}
+          patches={patches}
+          overlays={activeOverlays}
           placementMode={placementMode}
           previewPosition={previewPosition}
           deleteMode={deleteMode}
+          selectPatchMode={selectPatchMode}
+          selectedPatchIds={selectedPatchIds}
+          hoveredPatchId={hoveredPatchId}
           hoveredOverlayId={hoveredOverlayId}
+          viewMode={viewMode}
+          focusedPatch={focusedPatch}
+          overlayOpacity={overlayOpacity}
           onPreviewChange={setPreviewPosition}
           onCommitLine={handleCommitLine}
           onOverlayHover={setHoveredOverlayId}
           onOverlayDelete={handleDeleteOverlay}
+          onPatchHover={setHoveredPatchId}
+          onPatchToggle={handlePatchToggle}
+          onPatchFocus={handleFocusPatch}
         />
       </section>
 
@@ -198,15 +309,28 @@ function App() {
           hasImage={Boolean(imageState)}
           placementMode={placementMode}
           deleteMode={deleteMode}
+          selectPatchMode={selectPatchMode}
+          viewMode={viewMode}
+          focusedPatchId={focusedPatchId}
+          selectedPatchCount={selectedPatchCount}
           isAnalyzing={isAnalyzing}
           analysisOptions={analysisOptions}
+          overlayOpacity={overlayOpacity}
           onFileChange={handleFileChange}
           onAnalysisOptionsChange={setAnalysisOptions}
           onPlacementModeChange={handlePlacementModeChange}
           onToggleDeleteMode={handleToggleDeleteMode}
+          onTogglePatchSelectionMode={handleTogglePatchSelectionMode}
           onClearLines={handleClearLines}
           onResetDeletedOverlays={() => setDeletedOverlayIds(new Set())}
           onAnalyze={handleAnalyze}
+          onOverlayOpacityChange={setOverlayOpacity}
+          onReturnToFullView={handleReturnToFullView}
+          onFocusPreviousPatch={() => handleFocusSiblingPatch("previous")}
+          onFocusNextPatch={() => handleFocusSiblingPatch("next")}
+          onDeleteAllPatchOverlays={
+            focusedPatchId ? () => handleDeleteAllPatchOverlays(focusedPatchId) : undefined
+          }
         />
 
         {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}
@@ -217,6 +341,7 @@ function App() {
           totalCounts={totalCounts}
           manualCounts={manualCounts}
           onManualCountChange={handleManualCountChange}
+          onPatchOpen={handleFocusPatch}
         />
       </aside>
     </main>

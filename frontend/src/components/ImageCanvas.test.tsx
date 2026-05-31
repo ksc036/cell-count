@@ -8,7 +8,9 @@ describe("ImageCanvas", () => {
     render(
       <ImageCanvas
         deleteMode={false}
+        focusedPatch={null}
         hoveredOverlayId={null}
+        hoveredPatchId={null}
         imageState={{
           file: new File(["test"], "test.png"),
           url: "http://example.com/test.png",
@@ -18,10 +20,18 @@ describe("ImageCanvas", () => {
         lines={[]}
         overlays={[]}
         placementMode="horizontal"
+        patches={[]}
         previewPosition={null}
+        selectPatchMode={false}
+        selectedPatchIds={new Set()}
+        viewMode="full"
+        overlayOpacity={0.22}
         onCommitLine={commitLine}
         onOverlayDelete={vi.fn()}
         onOverlayHover={vi.fn()}
+        onPatchFocus={vi.fn()}
+        onPatchHover={vi.fn()}
+        onPatchToggle={vi.fn()}
         onPreviewChange={vi.fn()}
       />
     );

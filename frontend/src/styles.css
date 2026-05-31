@@ -104,6 +104,10 @@ body {
   cursor: crosshair;
 }
 
+.image-stage-patch {
+  min-height: 72vh;
+}
+
 .divider-line {
   stroke: #0f6d7b;
   stroke-width: 2;
@@ -116,7 +120,7 @@ body {
 }
 
 .overlay-shape {
-  fill: rgba(255, 119, 66, 0.22);
+  fill: rgba(255, 119, 66, var(--overlay-opacity, 0.22));
   stroke: #ff7742;
   stroke-width: 1.5;
   pointer-events: visiblePainted;
@@ -128,10 +132,48 @@ body {
   stroke-width: 2;
 }
 
+.patch-region {
+  fill: rgba(15, 109, 123, 0.12);
+  stroke: rgba(15, 109, 123, 0.3);
+  stroke-width: 1.5;
+}
+
+.patch-region.is-hidden {
+  fill: transparent;
+  stroke: transparent;
+}
+
+.patch-region.is-hovered {
+  fill: rgba(15, 109, 123, 0.18);
+  stroke: rgba(15, 109, 123, 0.7);
+}
+
+.patch-region.is-selected {
+  fill: rgba(240, 139, 36, 0.2);
+  stroke: rgba(240, 139, 36, 0.9);
+}
+
+.patch-label-pill {
+  fill: rgba(16, 36, 63, 0.9);
+}
+
+.patch-label-text {
+  fill: white;
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
 .panel-block {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.helper-copy {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #5a6f88;
 }
 
 .input-grid {

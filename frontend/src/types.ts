@@ -39,6 +39,8 @@ export type PatchUpload = {
   height: number;
 };
 
+export type ViewMode = "full" | "patch";
+
 export type AnalyzeOptions = {
   modelName?: string;
   channelMode?: "average" | "red" | "green" | "blue";
@@ -68,6 +70,8 @@ export type PatchAnalysisResult = {
   patchId: string;
   overlays: PatchLocalOverlay[];
 };
+
+export type OverlayMap = Record<string, GlobalOverlay[]>;
 
 export type AnalyzeResponse = {
   patchResults: PatchAnalysisResult[];

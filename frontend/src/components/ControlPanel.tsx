@@ -1,34 +1,56 @@
 import type { ChangeEvent } from "react";
-import type { AnalyzeOptions, LineOrientation } from "../types";
+import type { AnalyzeOptions, LineOrientation, ViewMode } from "../types";
 
 type ControlPanelProps = {
   hasImage: boolean;
   placementMode: LineOrientation | null;
   deleteMode: boolean;
+  selectPatchMode: boolean;
+  viewMode: ViewMode;
+  focusedPatchId: string | null;
+  selectedPatchCount: number;
   isAnalyzing: boolean;
   analysisOptions: AnalyzeOptions;
+  overlayOpacity: number;
   onFileChange: (file: File | null) => void;
   onAnalysisOptionsChange: (options: AnalyzeOptions) => void;
   onPlacementModeChange: (mode: LineOrientation | null) => void;
   onToggleDeleteMode: () => void;
+  onTogglePatchSelectionMode: () => void;
   onClearLines: () => void;
   onResetDeletedOverlays: () => void;
   onAnalyze: () => void;
+  onOverlayOpacityChange: (value: number) => void;
+  onReturnToFullView: () => void;
+  onFocusPreviousPatch: () => void;
+  onFocusNextPatch: () => void;
+  onDeleteAllPatchOverlays?: () => void;
 };
 
 function ControlPanel({
   hasImage,
   placementMode,
   deleteMode,
+  selectPatchMode,
+  viewMode,
+  focusedPatchId,
+  selectedPatchCount,
   isAnalyzing,
   analysisOptions,
+  overlayOpacity,
   onFileChange,
   onAnalysisOptionsChange,
   onPlacementModeChange,
   onToggleDeleteMode,
+  onTogglePatchSelectionMode,
   onClearLines,
   onResetDeletedOverlays,
-  onAnalyze
+  onAnalyze,
+  onOverlayOpacityChange,
+  onReturnToFullView,
+  onFocusPreviousPatch,
+  onFocusNextPatch,
+  onDeleteAllPatchOverlays
 }: ControlPanelProps) {
   function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
@@ -79,7 +101,13 @@ function ControlPanel({
           <button disabled={!hasImage} type="button" onClick={onClearLines}>
             Clear lines
           </button>
+          <button className={selectPatchMode ? "active" : ""} disabled={!hasImage} type="button" onClick={onTogglePatchSelectionMode}>
+            {selectPatchMode ? "Selecting patches..." : "원하는 patch만 보내기"}
+          </button>
         </div>
+        <p className="helper-copy">
+          {selectedPatchCount > 0 ? `${selectedPatchCount} patch selected for the next analysis.` : "No patch selected: analyze all patches."}
+        </p>
       </div>
 
       <div className="panel-block">
@@ -143,7 +171,7 @@ function ControlPanel({
           </label>
         </div>
         <button className="primary-button" disabled={!hasImage || isAnalyzing} type="button" onClick={onAnalyze}>
-          {isAnalyzing ? "Analyzing..." : "Run patch analysis"}
+          {isAnalyzing ? "Analyzing..." : selectedPatchCount > 0 ? "Analyze selected patches" : "Run patch analysis"}
         </button>
       </div>
 
@@ -155,6 +183,43 @@ function ControlPanel({
           </button>
           <button disabled={!hasImage} type="button" onClick={onResetDeletedOverlays}>
             Reset deleted overlays
+          </button>
+        </div>
+      </div>
+
+      <div className="panel-block">
+        <p className="panel-label">5. View mode</p>
+        <div className="button-grid">
+          <button className={viewMode === "full" ? "active" : ""} disabled={!hasImage} type="button" onClick={onReturnToFullView}>
+            전체 이미지 보기
+          </button>
+          <button className={viewMode === "patch" ? "active" : ""} disabled={!focusedPatchId} type="button" onClick={onFocusPreviousPatch}>
+            이전 patch
+          </button>
+          <button className={viewMode === "patch" ? "active" : ""} disabled={!focusedPatchId} type="button" onClick={onFocusNextPatch}>
+            다음 patch
+          </button>
+        </div>
+        {viewMode === "patch" && focusedPatchId ? <p className="helper-copy">Patch detail: {focusedPatchId}</p> : null}
+      </div>
+
+      <div className="panel-block">
+        <p className="panel-label">6. Patch tools</p>
+        <label>
+          Overlay opacity
+          <input
+            aria-label="Overlay opacity"
+            max={0.9}
+            min={0.05}
+            step={0.05}
+            type="range"
+            value={overlayOpacity}
+            onChange={(event) => onOverlayOpacityChange(Number(event.target.value))}
+          />
+        </label>
+        <div className="button-grid">
+          <button disabled={!focusedPatchId} type="button" onClick={onDeleteAllPatchOverlays}>
+            해당 Patch 전체 세그먼트 제거
           </button>
         </div>
       </div>

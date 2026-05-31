@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Patch, PatchAnalysisResult } from "../types";
-import { mergePatchResults, summarizePatchCounts, summarizeTotals } from "./overlays";
+import { mergePatchResults, mergePatchResultsByPatch, replaceOverlayMap, summarizePatchCounts, summarizeTotals } from "./overlays";
 
 const patches: Patch[] = [
   { id: "R1C1", rowIndex: 0, columnIndex: 0, x: 0, y: 0, width: 50, height: 50, label: "R1C1" },
@@ -52,7 +52,7 @@ describe("overlay helpers", () => {
   });
 
   it("recomputes counts using deleted overlays and manual additions", () => {
-    const overlays = mergePatchResults(patches, patchResults);
+    const overlays = mergePatchResultsByPatch(patches, patchResults);
     const patchCounts = summarizePatchCounts(patches, overlays, new Set(["R1C1:ov-1"]), {
       R1C1: 2,
       R1C2: 1
@@ -67,5 +67,20 @@ describe("overlay helpers", () => {
       manualAddedCount: 3,
       finalCount: 4
     });
+  });
+
+  it("replaces only the returned patch overlays", () => {
+    const initial = mergePatchResultsByPatch(patches, patchResults);
+    const replacement = mergePatchResultsByPatch(patches, [
+      {
+        patchId: "R1C2",
+        overlays: []
+      }
+    ]);
+
+    const merged = replaceOverlayMap(initial, replacement);
+
+    expect(merged.R1C1).toHaveLength(1);
+    expect(merged.R1C2).toEqual([]);
   });
 });

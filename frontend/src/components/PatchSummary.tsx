@@ -7,9 +7,10 @@ type PatchSummaryProps = {
   totalCounts: TotalCountSummary;
   manualCounts: Record<string, number>;
   onManualCountChange: (patchId: string, value: number) => void;
+  onPatchOpen: (patchId: string) => void;
 };
 
-function PatchSummary({ patches, patchCounts, totalCounts, manualCounts, onManualCountChange }: PatchSummaryProps) {
+function PatchSummary({ patches, patchCounts, totalCounts, manualCounts, onManualCountChange, onPatchOpen }: PatchSummaryProps) {
   const patchMap = new Map(patchCounts.map((patchCount) => [patchCount.patchId, patchCount]));
 
   function handleChange(patchId: string, event: ChangeEvent<HTMLInputElement>) {
@@ -52,6 +53,9 @@ function PatchSummary({ patches, patchCounts, totalCounts, manualCounts, onManua
                 <span>Auto {count.automaticCount}</span>
                 <span>Final {count.finalCount}</span>
               </div>
+              <button type="button" onClick={() => onPatchOpen(patch.id)}>
+                Patch 상세 보기
+              </button>
               <label>
                 Manual add
                 <input

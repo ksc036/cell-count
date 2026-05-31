@@ -1,5 +1,6 @@
 import type {
   GlobalOverlay,
+  OverlayMap,
   Patch,
   PatchAnalysisResult,
   PatchCountSummary,
@@ -41,16 +42,36 @@ export function mergePatchResults(patches: Patch[], patchResults: PatchAnalysisR
   });
 }
 
+export function mergePatchResultsByPatch(patches: Patch[], patchResults: PatchAnalysisResult[]): OverlayMap {
+  return patchResults.reduce<OverlayMap>((accumulator, result) => {
+    accumulator[result.patchId] = mergePatchResults(patches, [result]);
+    return accumulator;
+  }, {});
+}
+
+export function replaceOverlayMap(existing: OverlayMap, incoming: OverlayMap): OverlayMap {
+  return {
+    ...existing,
+    ...incoming
+  };
+}
+
+export function flattenOverlayMap(overlayMap: OverlayMap): GlobalOverlay[] {
+  return Object.values(overlayMap).flat();
+}
+
+export function collectPatchOverlayIds(overlayMap: OverlayMap, patchId: string): string[] {
+  return (overlayMap[patchId] ?? []).map((overlay) => overlay.globalId);
+}
+
 export function summarizePatchCounts(
   patches: Patch[],
-  overlays: GlobalOverlay[],
+  overlayMap: OverlayMap,
   deletedOverlayIds: Set<string>,
   manualCounts: Record<string, number>
 ): PatchCountSummary[] {
   return patches.map((patch) => {
-    const automaticCount = overlays.filter(
-      (overlay) => overlay.patchId === patch.id && !deletedOverlayIds.has(overlay.globalId)
-    ).length;
+    const automaticCount = (overlayMap[patch.id] ?? []).filter((overlay) => !deletedOverlayIds.has(overlay.globalId)).length;
     const manualAddedCount = manualCounts[patch.id] ?? 0;
     return {
       patchId: patch.id,
