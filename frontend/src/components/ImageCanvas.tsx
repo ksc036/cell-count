@@ -124,6 +124,56 @@ function ImageCanvas({
     );
   }
 
+  if (visiblePatch) {
+    return (
+      <section className="canvas-shell patch-detail-shell">
+        <div className="patch-detail-stage" style={{ aspectRatio: `${visiblePatch.width} / ${visiblePatch.height}` }}>
+          <img
+            alt={visiblePatch.label}
+            className="patch-detail-image"
+            src={imageState.url}
+            style={{
+              width: `${(imageState.width / visiblePatch.width) * 100}%`,
+              height: `${(imageState.height / visiblePatch.height) * 100}%`,
+              left: `-${(visiblePatch.x / visiblePatch.width) * 100}%`,
+              top: `-${(visiblePatch.y / visiblePatch.height) * 100}%`
+            }}
+          />
+          <svg
+            aria-label="Patch detail workspace"
+            className="patch-overlay-stage"
+            viewBox={`0 0 ${visiblePatch.width} ${visiblePatch.height}`}
+            onMouseLeave={handleMouseLeave}
+          >
+            {detailOverlays.map((overlay) => (
+              <polygon
+                key={overlay.globalId}
+                className={hoveredOverlayId === overlay.globalId ? "overlay-shape is-hovered" : "overlay-shape"}
+                points={overlay.localPoints}
+                style={{
+                  ["--overlay-opacity" as string]: String(overlayOpacity),
+                  pointerEvents: deleteMode ? "auto" : "none"
+                }}
+                onClick={(event) => {
+                  if (!deleteMode) {
+                    return;
+                  }
+                  event.stopPropagation();
+                  onOverlayDelete(overlay.globalId);
+                }}
+                onMouseEnter={() => {
+                  if (deleteMode) {
+                    onOverlayHover(overlay.globalId);
+                  }
+                }}
+              />
+            ))}
+          </svg>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="canvas-shell">
       <svg
@@ -134,17 +184,7 @@ function ImageCanvas({
         onMouseLeave={handleMouseLeave}
         onMouseMove={handleMouseMove}
       >
-        {visiblePatch ? (
-          <image
-            height={imageState.height}
-            href={imageState.url}
-            width={imageState.width}
-            x={-visiblePatch.x}
-            y={-visiblePatch.y}
-          />
-        ) : (
-          <image height={imageState.height} href={imageState.url} width={imageState.width} x={0} y={0} />
-        )}
+        <image height={imageState.height} href={imageState.url} width={imageState.width} x={0} y={0} />
 
         {viewMode === "full"
           ? visiblePatches.map((patch) => {
@@ -211,31 +251,7 @@ function ImageCanvas({
           <line className="preview-line" x1={previewPosition} x2={previewPosition} y1={0} y2={imageState.height} />
         ) : null}
 
-        {visiblePatch
-          ? detailOverlays.map((overlay) => (
-              <polygon
-                key={overlay.globalId}
-                className={hoveredOverlayId === overlay.globalId ? "overlay-shape is-hovered" : "overlay-shape"}
-                points={overlay.localPoints}
-                style={{
-                  ["--overlay-opacity" as string]: String(overlayOpacity),
-                  pointerEvents: deleteMode ? "auto" : "none"
-                }}
-                onClick={(event) => {
-                  if (!deleteMode) {
-                    return;
-                  }
-                  event.stopPropagation();
-                  onOverlayDelete(overlay.globalId);
-                }}
-                onMouseEnter={() => {
-                  if (deleteMode) {
-                    onOverlayHover(overlay.globalId);
-                  }
-                }}
-              />
-            ))
-          : visibleOverlays.map((overlay) => (
+        {visibleOverlays.map((overlay) => (
           <polygon
             key={overlay.globalId}
             className={hoveredOverlayId === overlay.globalId ? "overlay-shape is-hovered" : "overlay-shape"}
