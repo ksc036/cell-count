@@ -25,7 +25,10 @@ type ImageState = {
 };
 
 function nextLineId() {
-  return `line-${crypto.randomUUID()}`;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `line-${crypto.randomUUID()}`;
+  }
+  return `line-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function nextOrientation(mode: LineOrientation | null): LineOrientation | null {
