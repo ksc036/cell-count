@@ -31,6 +31,8 @@ If this is a fresh Ubuntu machine, run:
 ./start-dev.sh
 ```
 
+This project's backend is pinned around `tensorflow==2.16.2`, so the safest target is `Python 3.11`. The setup script now installs and uses that version explicitly for `.venv`.
+
 What these scripts do:
 
 - `setup-ubuntu.sh`: installs system packages, creates `.venv`, installs backend Python packages, installs frontend npm packages

@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-}"
+RECOMMENDED_PYTHON_VERSION="${RECOMMENDED_PYTHON_VERSION:-3.11}"
 status=0
 warning_count=0
 
@@ -76,6 +77,10 @@ fi
 
 if [[ -x "${ROOT_DIR}/.venv/bin/python" ]]; then
   print_ok "project virtualenv present at .venv"
+  VENV_VERSION="$("${ROOT_DIR}/.venv/bin/python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
+  if [[ "${VENV_VERSION}" != "${RECOMMENDED_PYTHON_VERSION}" ]]; then
+    print_note ".venv uses Python ${VENV_VERSION:-unknown}; Python ${RECOMMENDED_PYTHON_VERSION} is recommended for TensorFlow 2.16.2"
+  fi
 else
   print_note "project virtualenv missing (.venv) - recommended, but not required if python3 already has the needed packages"
 fi
