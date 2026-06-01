@@ -47,8 +47,8 @@ What these scripts do:
 
 This starts:
 
-- frontend: `http://127.0.0.1:5173`
-- backend: `http://127.0.0.1:8000`
+- frontend: `http://0.0.0.0:5173`
+- backend: `http://0.0.0.0:8000`
 
 Press `Ctrl+C` to stop both processes together.
 
