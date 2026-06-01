@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import type { MouseEvent } from "react";
 import type { DividerLine, GlobalOverlay, LineOrientation, Patch, ViewMode } from "../types";
 
 type ImageState = {
@@ -63,73 +63,6 @@ function ImageCanvas({
   onPatchToggle,
   onPatchFocus
 }: ImageCanvasProps) {
-  const [detailImageUrl, setDetailImageUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!imageState || !focusedPatch || viewMode !== "patch") {
-      setDetailImageUrl((current) => {
-        if (current) {
-          URL.revokeObjectURL(current);
-        }
-        return null;
-      });
-      return;
-    }
-
-    let disposed = false;
-    let nextUrl: string | null = null;
-    const image = new Image();
-    image.src = imageState.url;
-
-    image
-      .decode()
-      .then(() => {
-        if (disposed) {
-          return;
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = focusedPatch.width;
-        canvas.height = focusedPatch.height;
-        const context = canvas.getContext("2d");
-        if (!context) {
-          return;
-        }
-        context.drawImage(
-          image,
-          focusedPatch.x,
-          focusedPatch.y,
-          focusedPatch.width,
-          focusedPatch.height,
-          0,
-          0,
-          focusedPatch.width,
-          focusedPatch.height
-        );
-        canvas.toBlob((blob) => {
-          if (disposed || !blob) {
-            return;
-          }
-          nextUrl = URL.createObjectURL(blob);
-          setDetailImageUrl((current) => {
-            if (current) {
-              URL.revokeObjectURL(current);
-            }
-            return nextUrl;
-          });
-        }, "image/png");
-      })
-      .catch(() => {
-        setDetailImageUrl(null);
-      });
-
-    return () => {
-      disposed = true;
-      if (nextUrl) {
-        URL.revokeObjectURL(nextUrl);
-      }
-    };
-  }, [imageState, focusedPatch, viewMode]);
-
   function getImagePosition(event: MouseEvent<SVGSVGElement>) {
     if (!imageState) {
       return null;
@@ -202,9 +135,13 @@ function ImageCanvas({
         onMouseMove={handleMouseMove}
       >
         {visiblePatch ? (
-          detailImageUrl ? (
-            <image height={visiblePatch.height} href={detailImageUrl} width={visiblePatch.width} x={0} y={0} />
-          ) : null
+          <image
+            height={imageState.height}
+            href={imageState.url}
+            width={imageState.width}
+            x={-visiblePatch.x}
+            y={-visiblePatch.y}
+          />
         ) : (
           <image height={imageState.height} href={imageState.url} width={imageState.width} x={0} y={0} />
         )}
