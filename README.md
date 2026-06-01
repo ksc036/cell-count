@@ -21,6 +21,19 @@ Local web app for microscopy cell counting with patch-based StarDist analysis an
 - Enter manual additional cell counts per patch
 - See automatic, manual, and final totals immediately
 
+## One-command local run
+
+```bash
+./start-dev.sh
+```
+
+This starts:
+
+- frontend: `http://127.0.0.1:5173`
+- backend: `http://127.0.0.1:8000`
+
+Press `Ctrl+C` to stop both processes together.
+
 ## Frontend setup
 
 ```bash
