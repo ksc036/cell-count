@@ -21,6 +21,22 @@ Local web app for microscopy cell counting with patch-based StarDist analysis an
 - Enter manual additional cell counts per patch
 - See automatic, manual, and final totals immediately
 
+## Ubuntu first-time setup
+
+If this is a fresh Ubuntu machine, run:
+
+```bash
+./setup-ubuntu.sh
+./check-env.sh
+./start-dev.sh
+```
+
+What these scripts do:
+
+- `setup-ubuntu.sh`: installs system packages, creates `.venv`, installs backend Python packages, installs frontend npm packages
+- `check-env.sh`: verifies that Python, uvicorn, Node.js, npm, `.venv`, and `frontend/node_modules` are ready
+- `start-dev.sh`: starts frontend and backend together
+
 ## One-command local run
 
 ```bash
@@ -33,6 +49,8 @@ This starts:
 - backend: `http://127.0.0.1:8000`
 
 Press `Ctrl+C` to stop both processes together.
+
+`start-dev.sh` prefers the project virtualenv at `.venv/bin/python` when it exists, and otherwise falls back to `python3`.
 
 ## Frontend setup
 
